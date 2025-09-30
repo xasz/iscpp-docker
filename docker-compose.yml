@@ -1,0 +1,51 @@
+services:
+  iscpp-db:
+    image: postgres:16
+    container_name: iscpp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - iscpp-db:/var/lib/postgresql/data
+
+  iscpp-nginx:
+    image: nginx:latest
+    container_name: iscpp-nginx
+    depends_on:
+      - iscpp-app
+    volumes:
+      - iscpp-app:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "${APP_PORT:-8080}:80"
+
+
+  iscpp-app:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile
+    container_name: iscpp-app
+    restart: unless-stopped
+    depends_on:
+      - iscpp-db
+    volumes:
+      - iscpp-app:/var/www
+    environment:
+      MY_APP_KEY: "${MY_APP_KEY:-}"
+      DB_CONNECTION: ${ISCPP_DB_CONNECTION:-pgsql}
+      DB_HOST: iscpp-db
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      ISCPP_BRANCH: ${ISCPP_BRANCH:-main}
+      USER_DEFAULT_TIMEZONE: ${USER_DEFAULT_TIMEZONE}
+    entrypoint: ["sh", "/usr/local/bin/entrypoint.sh"]
+
+volumes:
+  iscpp-db:
+  iscpp-app:
