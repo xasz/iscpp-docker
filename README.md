@@ -3,6 +3,8 @@ ISCPP docker configuration
 
 > I am not a docker expert
 
+Please reboot the containers, after first successfull deployment and after an ISCPP update.
+
 ## Quick Start
 
 1. Update the .env
