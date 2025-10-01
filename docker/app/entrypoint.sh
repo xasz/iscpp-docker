@@ -3,9 +3,18 @@ set -e
 
 APP_DIR=/var/www
 GITHUB_REPO="xasz/ISCPP"
-GITHUB_BRANCH="${ISCPP_BRANCH:-main}"
+GITHUB_BRANCH=$ISCPP_BRANCH
 
 cd $APP_DIR
+
+if [ "$ISCPP_CA_IMPORT" = "1" ]; then
+  echo "Importing custom CA"
+  update-ca-certificates
+  echo "openssl.cafile=/etc/ssl/certs/ca-certificates.crt" > /usr/local/etc/php/conf.d/99-ca.ini
+  echo "curl.cainfo=/etc/ssl/certs/ca-certificates.crt" >> /usr/local/etc/php/conf.d/99-ca.ini
+else
+  echo "No custom CA provided, skipping import."
+fi
 
 install_app () {
     echo "🔄 Fetching ISCPP from GitHub..."
@@ -18,21 +27,29 @@ install_app () {
       TAR_URL=$(curl -s https://api.github.com/repos/$GITHUB_REPO/releases/latest | jq -r '.tarball_url')
   fi
 
-  # App-Verzeichnis sauber machen
-  find $APP_DIR -mindepth 1 ! -name ".env" -exec rm -rf {} +
-  curl -sL $TAR_URL | tar xz --strip-components=1 -C $APP_DIR
+  echo "Download URL: $TAR_URL"
+
+  curl -L "$TAR_URL" -o /tmp/iscpp_download.tar.gz
+
+  if tar tzf /tmp/iscpp_download.tar.gz >/dev/null 2>&1; then
+
+    echo "Download successful, extracting..."
+    tar xz --strip-components=1 -C "$APP_DIR" -f /tmp/iscpp_download.tar.gz
+  else
+    echo "Download failed or not a valid tar.gz file:"
+    cat /tmp/iscpp_download.tar.gz
+    exit 1
+  fi
 
 
   if [ ! -f ".env" ]; then
       echo "Creating .env file..."
       touch .env
       echo "APP_KEY=" >> .env
-      echo "QUEUE_CONNECTION=sqlite" >> .env
-      echo "CACHE_STORE=file" >> .env
   fi
-
+  
   echo "📦 Installing Composer dependencies..."
-  composer install --no-dev --optimize-autoloader
+  composer install --no-dev --optimize-autoloader $COMPOSER_OPTIONS
 
   echo "⚙️ Running NPM setup..."
   npm install
@@ -55,7 +72,16 @@ install_app () {
 
 upgrade_app () {
   echo "🚀 Upgrading ISCPP to latest version..."
-  rm -f $APP_DIR/.installed
+
+  echo "Backing up existing .env..."
+  mv .env /tmp/.env.backup
+  
+  echo "Cleaning up old files..."
+  rm -r $APP_DIR/*
+
+  echo "Restoring .env from backup..."
+  mv /tmp/.env.backup .env
+
   install_app
 }
 
@@ -93,9 +119,13 @@ update_config() {
 
   set_config "BROADCAST_CONNECTION" "log"
 
-  echo "Show Config"
-
-  cat .env
+  if [ "$ISCPP_EXPOSE_CONFIG" = "1" ]; then
+    echo "⚠️ ISCPP_EXPOSE_CONFIG is enabled. Exposing .env contents:"
+    echo "---------- ISCPP .ENV FILE ----------"
+    cat .env
+    echo "---------- ISCPP .ENV END ----------"
+    echo "Configuration update complete."
+  fi
 }
 
 if [ "$1" = "upgrade-iscpp" ]; then
@@ -107,9 +137,9 @@ fi
 if [ ! -f "$APP_DIR/.installed" ]; then
   install_app
 else
-  if [ "$ISCPP_AUTO_UPDATE" = "true" ]; then
+  if [ "$ISCPP_AUTO_UPDATE" = "1" ]; then
     echo "🔄 Auto-update is enabled. Checking for updates..."
-    
+    upgrade_app
   fi
 fi
 

@@ -33,6 +33,7 @@ services:
       - iscpp-db
     volumes:
       - iscpp-app:/var/www
+      - ./docker/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
     environment:
       ISCPP_APP_KEY: "${ISCPP_APP_KEY:-}"
       ISCPP_APP_DEBUG: ${ISCPP_APP_DEBUG:-false}
@@ -46,9 +47,36 @@ services:
       ISCPP_DB_PASSWORD: ${ISCPP_DB_PASSWORD}
       ISCPP_BRANCH: ${ISCPP_BRANCH:-main}
       ISCPP_USER_DEFAULT_TIMEZONE: ${ISCPP_USER_DEFAULT_TIMEZONE:-'Europe/Berlin'}
-      ISCPP_AUTO_UPDATE: ${ISCPP_AUTO_UPDATE:-false}
+      ISCPP_AUTO_UPDATE: ${ISCPP_AUTO_UPDATE:-0}
+      ISCPP_CA_IMPORT: ${ISCPP_CA_IMPORT:-0}
+      ISCPP_EXPOSE_CONFIG: ${ISCPP_EXPOSE_CONFIG:-0}
     entrypoint: ["sh", "/usr/local/bin/entrypoint.sh"]
 
+
+  iscpp-worker:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile-worker
+    container_name: iscpp-worker
+    restart: unless-stopped
+    depends_on:
+      - iscpp-db
+    volumes:
+      - iscpp-app:/var/www
+    entrypoint: ["sh", "/usr/local/bin/entrypoint-worker.sh"]
+
+
+  iscpp-scheduler:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile-scheduler
+    container_name: iscpp-scheduler
+    restart: unless-stopped
+    depends_on:
+      - iscpp-db
+    volumes:
+      - iscpp-app:/var/www
+    entrypoint: ["sh", "/usr/local/bin/entrypoint-scheduler.sh"]
 
 volumes:
   iscpp-db:
