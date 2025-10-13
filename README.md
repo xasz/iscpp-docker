@@ -37,6 +37,6 @@ ISCPP_DB_PASSWORD=ThisIsASecretPasswordButYouShouldChangeIt
 
 ISCPP_USER_DEFAULT_TIMEZONE='Europe/Berlin'
 
-ISCPP_BRANCH=docker-support # This will migrate in main soon
+ISCPP_BRANCH=main
 
 ```
