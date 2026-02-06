@@ -20,8 +20,11 @@ services:
     volumes:
       - iscpp-app:/var/www
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./docker/nginx/certs:/etc/nginx/certs
+      - ./docker/app/entrypoint-nginx.sh:/entrypoint.sh
     ports:
-      - "${ISCPP_APP_PORT:-8080}:80"
+      - "${ISCPP_APP_PORT:-8883}:443"
+    entrypoint: ["sh", "/entrypoint.sh"]
 
   iscpp-app:
     build:

@@ -31,12 +31,12 @@ ISCPP_APP_KEY=
 
 ISCPP_DB_DATABASE=iscpp-db
 ISCPP_DB_USERNAME=iscpp-user
-ISCPP_APP_URL=http://localhost:8080
-ISCPP_APP_PORT=8080
+ISCPP_APP_URL=http://iscpp.local:8883
+ISCPP_APP_PORT=8883
 ISCPP_DB_PASSWORD=ThisIsASecretPasswordButYouShouldChangeIt
 
 ISCPP_USER_DEFAULT_TIMEZONE='Europe/Berlin'
 
-ISCPP_BRANCH=docker-support # This will migrate in main soon
+ISCPP_BRANCH=main
 
 ```
