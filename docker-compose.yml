@@ -24,6 +24,7 @@ services:
       - ./docker/app/entrypoint-nginx.sh:/entrypoint.sh
     ports:
       - "${ISCPP_APP_PORT:-8883}:443"
+      - "${ISCPP_APP_PORT_HTTP:-8880}:80"
     entrypoint: ["sh", "/entrypoint.sh"]
 
   iscpp-app:
