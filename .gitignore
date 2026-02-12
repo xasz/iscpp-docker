@@ -1,3 +1,4 @@
 docker/ca.crt
 docker/nginx/certs/iscpp.local.crt
 docker/nginx/certs/iscpp.local.key
+certs/ca.crt

@@ -1,87 +1,93 @@
 services:
-  iscpp-db:
-    image: postgres:16
-    container_name: iscpp-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${ISCPP_DB_USERNAME}
-      POSTGRES_PASSWORD: ${ISCPP_DB_PASSWORD}
-      POSTGRES_DB: ${ISCPP_DB_DATABASE}
-    ports:
-      - "${ISCPP_DB_PORT:-5432}:5432"
-    volumes:
-      - iscpp-db:/var/lib/postgresql/data
-
-  iscpp-nginx:
-    image: nginx:latest
-    container_name: iscpp-nginx
-    depends_on:
-      - iscpp-app
-    volumes:
-      - iscpp-app:/var/www
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ./docker/nginx/certs:/etc/nginx/certs
-      - ./docker/app/entrypoint-nginx.sh:/entrypoint.sh
-    ports:
-      - "${ISCPP_APP_PORT:-8883}:443"
-      - "${ISCPP_APP_PORT_HTTP:-8880}:80"
-    entrypoint: ["sh", "/entrypoint.sh"]
 
   iscpp-app:
-    build:
-      context: ./docker/app
-      dockerfile: Dockerfile
-    container_name: iscpp-app
+    image: ghcr.io/xasz/iscpp:latest
     restart: unless-stopped
     depends_on:
-      - iscpp-db
+      - iscpp-postgres
     volumes:
-      - iscpp-app:/var/www
-      - ./docker/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
+      - ./certs/ca.crt:/tmp/custom-ca.crt:ro
+      - iscpp-env:/var/www/env-volume
+      - iscpp-storage:/var/www/storage
+      - iscpp-public:/var/www/public-volume
     environment:
-      ISCPP_APP_KEY: "${ISCPP_APP_KEY:-}"
-      ISCPP_APP_DEBUG: ${ISCPP_APP_DEBUG:-false}
-      ISCPP_APP_ENV: ${ISCPP_APP_ENV:-production}
-      ISCPP_APP_URL: ${ISCPP_APP_URL:-http://localhost:8080}
-      ISCPP_DB_CONNECTION: ${ISCPP_DB_CONNECTION:-pgsql}
-      ISCPP_DB_HOST: iscpp-db
-      ISCPP_DB_PORT: ${ISCPP_DB_PORT:-5432}
-      ISCPP_DB_DATABASE: ${ISCPP_DB_DATABASE}
-      ISCPP_DB_USERNAME: ${ISCPP_DB_USERNAME}
-      ISCPP_DB_PASSWORD: ${ISCPP_DB_PASSWORD}
-      ISCPP_BRANCH: ${ISCPP_BRANCH:-main}
-      ISCPP_USER_DEFAULT_TIMEZONE: ${ISCPP_USER_DEFAULT_TIMEZONE:-'Europe/Berlin'}
-      ISCPP_AUTO_UPDATE: ${ISCPP_AUTO_UPDATE:-0}
-      ISCPP_CA_IMPORT: ${ISCPP_CA_IMPORT:-0}
-      ISCPP_EXPOSE_CONFIG: ${ISCPP_EXPOSE_CONFIG:-0}
-    entrypoint: ["sh", "/usr/local/bin/entrypoint.sh"]
-
+      APP_ENV: production
+      APP_DEBUG: false
+      APP_URL: http://localhost
+      DB_CONNECTION: pgsql
+      DB_HOST: iscpp-postgres
+      DB_PORT: 5432
+      DB_DATABASE: iscpp-db
+      DB_USERNAME: iscpp-db-user
+      DB_PASSWORD: ThisIsASecretPasswordButYouShouldChangeIt
+      IMPORT_CUSTOM_CA: "1"
+    networks:
+      - iscpp-net
+    command: sh -c "
+      echo 'Copying public assets...';
+      cp -r /var/www/public/* /var/www/public-volume/;
+      exec php-fpm"
 
   iscpp-worker:
-    build:
-      context: ./docker/app
-      dockerfile: Dockerfile-worker
-    container_name: iscpp-worker
+    image: ghcr.io/xasz/iscpp:latest
     restart: unless-stopped
+    command: php artisan queue:work --sleep=1 --tries=3
     depends_on:
-      - iscpp-db
+      - iscpp-postgres
+      - iscpp-app
     volumes:
-      - iscpp-app:/var/www
-    entrypoint: ["sh", "/usr/local/bin/entrypoint-worker.sh"]
+      - ./certs/ca.crt:/tmp/custom-ca.crt:ro
+      - iscpp-env:/var/www/env-volume
+      - iscpp-storage:/var/www/storage
+    environment:
+      IMPORT_CUSTOM_CA: "1"
+    networks:
+      - iscpp-net
 
 
   iscpp-scheduler:
-    build:
-      context: ./docker/app
-      dockerfile: Dockerfile-scheduler
-    container_name: iscpp-scheduler
+    image: ghcr.io/xasz/iscpp:latest
+    restart: unless-stopped
+    command: sh -c "while true; do php artisan schedule:run; sleep 60; done"
+    depends_on:
+      - iscpp-postgres
+      - iscpp-app
+    volumes:
+      - iscpp-env:/var/www/env-volume
+      - iscpp-storage:/var/www/storage
+    networks:
+      - iscpp-net
+
+  iscpp-nginx:
+    image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
-      - iscpp-db
+      - iscpp-app
+    ports:
+      - "80:80"
     volumes:
-      - iscpp-app:/var/www
-    entrypoint: ["sh", "/usr/local/bin/entrypoint-scheduler.sh"]
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - iscpp-public:/var/www/public:ro
+    networks:
+      - iscpp-net
+
+  iscpp-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: iscpp-db
+      POSTGRES_USER: iscpp-db-user
+      POSTGRES_PASSWORD: ThisIsASecretPasswordButYouShouldChangeIt
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - iscpp-net
 
 volumes:
-  iscpp-db:
-  iscpp-app:
+  postgres-data:
+  iscpp-env:
+  iscpp-storage:
+  iscpp-public:
+
+networks:
+  iscpp-net:
