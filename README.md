@@ -8,8 +8,8 @@ Please reboot the containers, after first successfull deployment and after an IS
 ## Quick Start
 
 1. Update the .env
-2. docker compose up -d --build
-3. Open [http://localhost:8080](http://localhost:8080) in your browser.
+2. docker compose up -d
+3. Open [http://localhost:8880](http://localhost:8800) in your browser.
 
 ## Environment Variables (`.env`)
 
